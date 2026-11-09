@@ -2,11 +2,13 @@
 
 A Java 21 and Spring Boot REST API demonstrating payment management and secure, idempotent refund processing.
 
+**Public repository:** [https://github.com/AnthonyUPF/secure-idempotent-refund-service](https://github.com/AnthonyUPF/secure-idempotent-refund-service)
+
 ## Technology Stack
 
 - Java 21
 - Spring Boot 3.5.16
-- Maven 3.10.0
+- Maven Wrapper
 - Spring Web
 - Spring Data JPA
 - Spring Security
@@ -18,64 +20,131 @@ A Java 21 and Spring Boot REST API demonstrating payment management and secure, 
 
 - Create, retrieve, update and delete payments.
 - Create and retrieve refunds.
-- Validate monetary amounts using BigDecimal.
+- Validate monetary amounts using `BigDecimal`.
 - Validate currency codes.
 - Prevent refunds exceeding the remaining refundable balance.
-- Support idempotent refund requests through the Idempotency-Key header.
+- Support idempotent refund requests through the `Idempotency-Key` header.
 - Return the original refund when the same key and request are repeated.
 - Reject reuse of an idempotency key with a different request.
 - Use pessimistic database locking to prevent concurrent over-refunds.
 - Require HTTP Basic authentication.
 - Encode passwords with BCrypt.
-- Return structured errors using Spring ProblemDetail.
+- Return structured errors using Spring `ProblemDetail`.
 
 The payment processor is a mock implementation. No real payment provider is contacted.
 
 ## Requirements
 
 - Java 21
-- Bash terminal (Linux, macOS or WSL)
+- Git
+- Bash terminal (Linux, macOS or WSL), or Windows PowerShell.
 
-The Maven Wrapper is included.
+The Maven Wrapper is included, so a separate Maven installation is not required.
 
-Check Java:
+Check your Java installation:
 
-    java -version
+```bash
+java -version
+```
+
+## Clone the Repository
+
+```bash
+git clone https://github.com/AnthonyUPF/secure-idempotent-refund-service.git
+
+cd secure-idempotent-refund-service
+```
 
 ## Configuration
 
-Set the HTTP Basic credentials before starting:
+The application requires two environment variables for HTTP Basic authentication:
 
-    export APP_SECURITY_USERNAME=refund-user
-    export APP_SECURITY_PASSWORD='Change-This-Local-Password'
+| Variable | Description |
+|---|---|
+| `APP_SECURITY_USERNAME` | Authentication username |
+| `APP_SECURITY_PASSWORD` | Authentication password |
 
-Do not commit credentials to version control.
+### Linux, macOS and WSL
+
+Set example development credentials:
+
+```bash
+export APP_SECURITY_USERNAME=refund-user
+export APP_SECURITY_PASSWORD='Change-This-Local-Password'
+```
+
+### Windows PowerShell
+
+```powershell
+$env:APP_SECURITY_USERNAME="refund-user"
+$env:APP_SECURITY_PASSWORD="Change-This-Local-Password"
+```
+
+These are example credentials only. Choose your own strong password.
+
+The application does not automatically load `.env` files. Set the environment variables in the terminal before starting the application.
+
+Do not commit real credentials or secrets to version control.
+
+### Database configuration
 
 The current configuration uses an H2 in-memory database:
 
-- JDBC URL: jdbc:h2:mem:refunddb
-- Port: 8080
+- JDBC URL: `jdbc:h2:mem:refunddb`
+- Port: `8080`
 - H2 console: disabled
 
 Data is not durable across application restarts.
 
 ## Build and Run
 
-Run tests:
+### Run tests
 
-    ./mvnw clean test
+Linux, macOS and WSL:
 
-Build:
+```bash
+./mvnw clean verify
+```
 
-    ./mvnw clean package
+Windows PowerShell:
 
-Start:
+```powershell
+.\mvnw.cmd clean verify
+```
 
-    export APP_SECURITY_USERNAME=refund-user
-    export APP_SECURITY_PASSWORD='Change-This-Local-Password'
-    ./mvnw spring-boot:run
+### Build the application
 
-The API is available at http://localhost:8080.
+Linux, macOS and WSL:
+
+```bash
+./mvnw clean package
+```
+
+Windows PowerShell:
+
+```powershell
+.\mvnw.cmd clean package
+```
+
+### Start the application
+
+First, configure the environment variables as described above.
+
+Linux, macOS and WSL:
+
+```bash
+./mvnw spring-boot:run
+```
+
+Windows PowerShell:
+
+```powershell
+.\mvnw.cmd spring-boot:run
+```
+
+The API will be available at:
+
+`http://localhost:8080`
 
 All endpoints require HTTP Basic authentication.
 
@@ -85,53 +154,69 @@ All endpoints require HTTP Basic authentication.
 
 | Method | Endpoint | Description |
 |---|---|---|
-| POST | /api/v1/payments | Create payment |
-| GET | /api/v1/payments | List payments |
-| GET | /api/v1/payments/{paymentId} | Retrieve payment |
-| PATCH | /api/v1/payments/{paymentId} | Cancel payment |
-| DELETE | /api/v1/payments/{paymentId} | Delete payment subject to business rules |
+| POST | `/api/v1/payments` | Create payment |
+| GET | `/api/v1/payments` | List payments |
+| GET | `/api/v1/payments/{paymentId}` | Retrieve payment |
+| PATCH | `/api/v1/payments/{paymentId}` | Cancel payment |
+| DELETE | `/api/v1/payments/{paymentId}` | Delete payment subject to business rules |
 
-Example:
+Create a payment:
 
-    curl -u "$APP_SECURITY_USERNAME:$APP_SECURITY_PASSWORD" \
-      -H 'Content-Type: application/json' \
-      -X POST http://localhost:8080/api/v1/payments \
-      -d '{"amount":100.00,"currency":"EUR"}'
+```bash
+curl -u "$APP_SECURITY_USERNAME:$APP_SECURITY_PASSWORD" \
+  -H 'Content-Type: application/json' \
+  -X POST http://localhost:8080/api/v1/payments \
+  -d '{"amount":100.00,"currency":"EUR"}'
+```
+
+The response includes the generated `paymentId`. Keep this UUID to use it when creating a refund.
+
+Cancel a payment:
+
+```bash
+curl -u "$APP_SECURITY_USERNAME:$APP_SECURITY_PASSWORD" \
+  -H 'Content-Type: application/json' \
+  -X PATCH http://localhost:8080/api/v1/payments/REPLACE_WITH_PAYMENT_UUID \
+  -d '{"status":"CANCELLED"}'
+```
 
 ### Refunds
 
 | Method | Endpoint | Description |
 |---|---|---|
-| POST | /api/v1/refunds | Create refund |
-| GET | /api/v1/refunds/{refundId} | Retrieve refund |
+| POST | `/api/v1/refunds` | Create refund |
+| GET | `/api/v1/refunds/{refundId}` | Retrieve refund |
 
-Example:
+Create a refund:
 
-    curl -u "$APP_SECURITY_USERNAME:$APP_SECURITY_PASSWORD" \
-      -H 'Content-Type: application/json' \
-      -H 'Idempotency-Key: refund-example-001' \
-      -X POST http://localhost:8080/api/v1/refunds \
-      -d '{"paymentId":"REPLACE_WITH_PAYMENT_UUID","amount":30.00,"currency":"EUR"}'
+```bash
+curl -u "$APP_SECURITY_USERNAME:$APP_SECURITY_PASSWORD" \
+  -H 'Content-Type: application/json' \
+  -H 'Idempotency-Key: refund-example-001' \
+  -X POST http://localhost:8080/api/v1/refunds \
+  -d '{"paymentId":"REPLACE_WITH_PAYMENT_UUID","amount":30.00,"currency":"EUR"}'
+```
 
 Replace the payment identifier with the UUID returned by payment creation.
 
-Repeat the same request with the same idempotency key to retrieve the original refund result. Reusing that key with a different payload returns HTTP 409 Conflict.
+Repeat the same request with the same idempotency key to retrieve the original refund result. Reusing that key with a different payload returns HTTP `409 Conflict`.
 
 ## HTTP Status Codes
 
-- 200 OK: successful retrieval or update.
-- 201 Created: resource created.
-- 400 Bad Request: invalid or missing request data.
-- 401 Unauthorized: missing or invalid authentication.
-- 404 Not Found: resource does not exist.
-- 409 Conflict: business rule or idempotency conflict.
-- 500 Internal Server Error: unexpected server error.
+- `200 OK`: successful retrieval or update.
+- `201 Created`: resource created.
+- `204 No Content`: resource successfully deleted.
+- `400 Bad Request`: invalid or missing request data.
+- `401 Unauthorized`: missing or invalid authentication.
+- `404 Not Found`: resource does not exist.
+- `409 Conflict`: business rule or idempotency conflict.
+- `500 Internal Server Error`: unexpected server error.
 
-Errors use Spring ProblemDetail.
+Errors use Spring `ProblemDetail`.
 
 ## Idempotency Design
 
-The refund API requires an Idempotency-Key header.
+The refund API requires an `Idempotency-Key` header.
 
 1. Validate the key format and length.
 2. Calculate a SHA-256 fingerprint from payment ID, normalised amount and currency.
@@ -145,19 +230,30 @@ A real external payment integration would additionally require provider-side ide
 
 ## Tests
 
-Run:
+Run the complete verification suite:
 
-    ./mvnw clean test
+```bash
+./mvnw clean verify
+```
 
-The integration tests cover authentication, payment operations, refund creation and retrieval, idempotent retries, key conflicts, balance validation and concurrent requests.
+The integration tests cover:
 
-Latest verified result: 15 tests, 0 failures, 0 errors, 0 skipped.
+- Authentication.
+- Payment operations.
+- Refund creation and retrieval.
+- Idempotent retries.
+- Idempotency key conflicts.
+- Refund balance validation.
+- Concurrent refund requests.
+
+Latest verified result: **15 tests, 0 failures, 0 errors, 0 skipped.**
 
 ## Documentation
 
-- SPEC.md: requirements, architecture, business rules and API design.
-- SECURITY_AUDIT.md: security controls, OWASP mapping and production recommendations.
-- PROMPTS.md: AI prompts, review process and documented correction.
+- `SPEC.md`: requirements, architecture, business rules and API design.
+- `SECURITY_AUDIT.md`: security controls, OWASP mapping and production recommendations.
+- `PROMPTS.md`: AI prompts, review process and documented correction.
+- `openapi.yaml`: OpenAPI 3.1 API contract.
 
 ## Production Considerations
 
