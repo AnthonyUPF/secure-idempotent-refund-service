@@ -1,0 +1,393 @@
+openapi: 3.1.0
+
+info:
+  title: Secure Idempotent Refund Service API
+  version: 1.0.0
+  description: |
+    REST API for payment management and secure, idempotent refunds.
+    All endpoints require HTTP Basic authentication.
+    Refund creation is protected by the Idempotency-Key request header.
+
+servers:
+  - url: http://localhost:8080
+    description: Local development server
+
+security:
+  - basicAuth: []
+
+tags:
+  - name: Payments
+    description: Payment lifecycle management
+  - name: Refunds
+    description: Idempotent payment refunds
+
+paths:
+  /api/v1/payments:
+    post:
+      tags: [Payments]
+      summary: Create a payment
+      operationId: createPayment
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PaymentRequest'
+      responses:
+        '201':
+          description: Payment created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaymentResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+    get:
+      tags: [Payments]
+      summary: List all payments
+      operationId: getAllPayments
+      responses:
+        '200':
+          description: Payments retrieved
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/PaymentResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /api/v1/payments/{paymentId}:
+    parameters:
+      - $ref: '#/components/parameters/PaymentId'
+
+    get:
+      tags: [Payments]
+      summary: Get a payment
+      operationId: getPayment
+      responses:
+        '200':
+          description: Payment retrieved
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaymentResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+    patch:
+      tags: [Payments]
+      summary: Cancel a payment
+      description: |
+        Cancels a payment that is still in CAPTURED status and has no refunds.
+        The only supported update is status=CANCELLED.
+      operationId: updatePayment
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PaymentUpdateRequest'
+      responses:
+        '200':
+          description: Payment cancelled
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaymentResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+    delete:
+      tags: [Payments]
+      summary: Delete a payment
+      description: Deletes a payment when it has no refunds.
+      operationId: deletePayment
+      responses:
+        '204':
+          description: Payment deleted
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /api/v1/refunds:
+    post:
+      tags: [Refunds]
+      summary: Create a refund
+      description: |
+        Creates a refund using an idempotency key.
+        Repeating the same key and request returns the original refund.
+        Reusing the same key with a different request returns a conflict.
+      operationId: createRefund
+      parameters:
+        - name: Idempotency-Key
+          in: header
+          required: true
+          description: Unique key identifying this refund operation.
+          schema:
+            type: string
+            minLength: 1
+            maxLength: 128
+            pattern: '^[A-Za-z0-9._:-]{1,128}$'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RefundRequest'
+      responses:
+        '201':
+          description: Refund created or original refund returned for an idempotent replay
+          headers:
+            Location:
+              description: URI of the created refund
+              schema:
+                type: string
+                format: uri-reference
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RefundResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /api/v1/refunds/{refundId}:
+    get:
+      tags: [Refunds]
+      summary: Get a refund
+      operationId: getRefund
+      parameters:
+        - name: refundId
+          in: path
+          required: true
+          description: Refund identifier
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Refund retrieved
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RefundResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+components:
+  securitySchemes:
+    basicAuth:
+      type: http
+      scheme: basic
+      description: HTTP Basic authentication. Use environment-configured credentials.
+
+  parameters:
+    PaymentId:
+      name: paymentId
+      in: path
+      required: true
+      description: Payment identifier
+      schema:
+        type: string
+        format: uuid
+
+  schemas:
+    PaymentRequest:
+      type: object
+      additionalProperties: false
+      required:
+        - amount
+        - currency
+      properties:
+        amount:
+          type: number
+          exclusiveMinimum: 0
+          multipleOf: 0.01
+          description: Positive payment amount with at most two decimal places.
+          example: 125.50
+        currency:
+          type: string
+          pattern: '^[A-Z]{3}$'
+          description: Three-letter uppercase currency code.
+          example: EUR
+
+    PaymentResponse:
+      type: object
+      required:
+        - paymentId
+        - amount
+        - currency
+        - status
+        - createdAt
+      properties:
+        paymentId:
+          type: string
+          format: uuid
+        amount:
+          type: number
+        currency:
+          type: string
+          example: EUR
+        status:
+          type: string
+          enum:
+            - CAPTURED
+            - PARTIALLY_REFUNDED
+            - REFUNDED
+            - CANCELLED
+        createdAt:
+          type: string
+          format: date-time
+
+    PaymentUpdateRequest:
+      type: object
+      additionalProperties: false
+      required:
+        - status
+      properties:
+        status:
+          type: string
+          enum:
+            - CANCELLED
+          description: The only supported payment update is cancellation.
+
+    RefundRequest:
+      type: object
+      additionalProperties: false
+      required:
+        - paymentId
+        - amount
+        - currency
+      properties:
+        paymentId:
+          type: string
+          format: uuid
+        amount:
+          type: number
+          exclusiveMinimum: 0
+          multipleOf: 0.01
+          description: Positive refund amount with at most two decimal places.
+          example: 25.00
+        currency:
+          type: string
+          pattern: '^[A-Z]{3}$'
+          example: EUR
+
+    RefundResponse:
+      type: object
+      required:
+        - refundId
+        - paymentId
+        - amount
+        - currency
+        - status
+        - createdAt
+      properties:
+        refundId:
+          type: string
+          format: uuid
+        paymentId:
+          type: string
+          format: uuid
+        amount:
+          type: number
+        currency:
+          type: string
+          example: EUR
+        status:
+          type: string
+          enum:
+            - COMPLETED
+        createdAt:
+          type: string
+          format: date-time
+
+    Problem:
+      type: object
+      description: RFC 9457 Problem Details response.
+      properties:
+        type:
+          type: string
+          format: uri
+        title:
+          type: string
+        status:
+          type: integer
+        detail:
+          type: string
+        instance:
+          type: string
+          format: uri-reference
+
+  responses:
+    BadRequest:
+      description: Invalid request data or missing required header
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+
+    Unauthorized:
+      description: Authentication required or invalid credentials
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+
+    NotFound:
+      description: Requested payment or refund was not found
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+
+    Conflict:
+      description: Business rule conflict or idempotency key reused with a different request
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+
+    InternalServerError:
+      description: Unexpected server error
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'

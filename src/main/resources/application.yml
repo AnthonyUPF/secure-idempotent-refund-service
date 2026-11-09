@@ -1,0 +1,27 @@
+spring:
+  application:
+    name: secure-idempotent-refund-service
+
+  datasource:
+    url: jdbc:h2:mem:refunddb
+    driver-class-name: org.h2.Driver
+    username: sa
+    password:
+
+  jpa:
+    hibernate:
+      ddl-auto: update
+    open-in-view: false
+    show-sql: false
+
+  h2:
+    console:
+      enabled: false
+
+server:
+  port: 8080
+
+app:
+  security:
+    username: ${APP_SECURITY_USERNAME}
+    password: ${APP_SECURITY_PASSWORD}
