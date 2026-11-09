@@ -2,7 +2,8 @@
 
 A Java 21 and Spring Boot REST API demonstrating payment management and secure, idempotent refund processing.
 
-**Public repository:** [https://github.com/AnthonyUPF/secure-idempotent-refund-service](https://github.com/AnthonyUPF/secure-idempotent-refund-service)
+**Public repository:**  
+https://github.com/AnthonyUPF/secure-idempotent-refund-service
 
 ## Technology Stack
 
@@ -64,34 +65,69 @@ The application requires two environment variables for HTTP Basic authentication
 | `APP_SECURITY_USERNAME` | Authentication username |
 | `APP_SECURITY_PASSWORD` | Authentication password |
 
-### Linux, macOS and WSL
+### Step 1. Create your local environment file
 
-Set example development credentials:
+The repository includes an `.env.example` file containing example development credentials.
+
+Copy it to create your own local configuration:
+
+**Linux, macOS and WSL:**
 
 ```bash
-export APP_SECURITY_USERNAME=refund-user
-export APP_SECURITY_PASSWORD='Change-This-Local-Password'
+cp .env.example .env
 ```
 
-### Windows PowerShell
+**Windows PowerShell:**
 
 ```powershell
-$env:APP_SECURITY_USERNAME="refund-user"
-$env:APP_SECURITY_PASSWORD="Change-This-Local-Password"
+Copy-Item .env.example .env
 ```
 
-These are example credentials only. Choose your own strong password.
+Edit `.env` and replace the example values with your own credentials.
 
-The application does not automatically load `.env` files. Set the environment variables in the terminal before starting the application.
+For example:
 
-Do not commit real credentials or secrets to version control.
+```dotenv
+APP_SECURITY_USERNAME=refund-user
+APP_SECURITY_PASSWORD=Change-This-Local-Password
+```
+
+Use a strong password of your own choice.
+
+**Important:** `.env` is a local configuration file and is excluded from Git. Never commit real credentials or secrets to version control.
+
+### Step 2. Load the environment variables
+
+Spring Boot does not automatically load `.env` files. You must load the variables into your terminal session before starting the application.
+
+**Linux, macOS and WSL:**
+
+```bash
+set -a
+source .env
+set +a
+```
+
+**Windows PowerShell:**
+
+```powershell
+Get-Content .env | ForEach-Object {
+    if ($_ -match '^\s*([^#\s][^=]*)=(.*)$') {
+        $name = $matches[1].Trim()
+        $value = $matches[2].Trim().Trim('"').Trim("'")
+        [Environment]::SetEnvironmentVariable($name, $value, "Process")
+    }
+}
+```
+
+These commands load the credentials into the current terminal session. Run the application from that same session.
 
 ### Database configuration
 
 The current configuration uses an H2 in-memory database:
 
 - JDBC URL: `jdbc:h2:mem:refunddb`
-- Port: `8080`
+- Application port: `8080`
 - H2 console: disabled
 
 Data is not durable across application restarts.
@@ -100,13 +136,13 @@ Data is not durable across application restarts.
 
 ### Run tests
 
-Linux, macOS and WSL:
+**Linux, macOS and WSL:**
 
 ```bash
 ./mvnw clean verify
 ```
 
-Windows PowerShell:
+**Windows PowerShell:**
 
 ```powershell
 .\mvnw.cmd clean verify
@@ -114,13 +150,13 @@ Windows PowerShell:
 
 ### Build the application
 
-Linux, macOS and WSL:
+**Linux, macOS and WSL:**
 
 ```bash
 ./mvnw clean package
 ```
 
-Windows PowerShell:
+**Windows PowerShell:**
 
 ```powershell
 .\mvnw.cmd clean package
@@ -128,15 +164,15 @@ Windows PowerShell:
 
 ### Start the application
 
-First, configure the environment variables as described above.
+First, complete the configuration steps and load the environment variables.
 
-Linux, macOS and WSL:
+**Linux, macOS and WSL:**
 
 ```bash
 ./mvnw spring-boot:run
 ```
 
-Windows PowerShell:
+**Windows PowerShell:**
 
 ```powershell
 .\mvnw.cmd spring-boot:run
@@ -144,9 +180,9 @@ Windows PowerShell:
 
 The API will be available at:
 
-`http://localhost:8080`
+http://localhost:8080
 
-All endpoints require HTTP Basic authentication.
+All endpoints require HTTP Basic authentication. Use the username and password configured in `.env`.
 
 ## API Endpoints
 
